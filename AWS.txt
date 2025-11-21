@@ -1,0 +1,525 @@
+/var/log/cloud-init.log / /var/log/cloud-init-output.log  : we can see the log of user data/boot sript here.
+
+
+
+aws
+-----------
+EC2: Elastic compute cloud
+-----------------------------
+
+public key will be place  in server :in ~/.ssh/authoried_keys
+ * lsblk : to list block storage
+ 
+storage services : EBS,EFS,S3
+EBS: elastic block storage
+-------------------------------
+EBS : in ebs the data will equaly distributed into blocks
+  max size is 16tg=16000gb 
+  min size is 1gb
+  EC2 and EBS should be in same avaliblity zone
+  EBS can't be shared with multipule server at a time
+
+  [ansible@ip-172-31-42-125 ~]$ sudo file -s /dev/xvda1
+/dev/xvda1: data
+[ansible@ip-172-31-42-125 ~]$ sudo file -s /dev/xvda2
+/dev/xvda2: SGI XFS filesystem data (blksz 4096, inosz 512, v2 dirs)
+[ansible@ip-172-31-42-125 ~]$
+ NOTE : as mentioned above SGI XFS is data format in which the data has to store
+ *lsblk : to see the block stores
+ * sudo file -s /dev/xvda1: to see  the file format here /dev/=device additional storage
+ * sudo mkfs.ext4 /dev/xvdf: uses to give file format here MKFS.EXT4 is format we can any format
+*  sudo mount /dev/xvdf /var/lib/jenkins/:to mount to ebs to a volume
+
+Now /var/lib/jenkins is mouted to volume temporarily if we restart instancs it will be unmounted. To mount permanently please follow below steps.
+
+ NOTE:steps to follow
+ 1.we have to take block id by USING COMMAND:sudo blkid.(2267024f-f6b0-40a6-b2d7-9faa712d2677)
+ 2.we have to take backup of /etc/fstab file because if we make any mistake in that file the server will not up again. 
+ 3.we have to edit /etc/fstab UUID=2267024f-f6b0-40a6-b2d7-9faa712d2677 /var/lib/jenkins        ext4 
+ 4.we have exsecute "sudo unmount <mounted folder>" and again "sudo mount -a" the check weather file is coorect or not if we get any  error revert the old file.
+  
+if the server termenated there volume will remain safe where as root volume will get deleted,and we can use that EBS to other servers
+
+SNAPSHORT
+----------------
+snapshort are backup of volumes(EBS)
+snapshorts are maintained in s3 bucket
+using snapshot we can move/migrate data from one AZ to another AZ in same region or we can move one region to another region
+
+LIFECYCLE MANAGER
+----------------------
+using lifecycle manager we can take snapshort automatically by using scheduler consept.
+
+
+EFS : elastic file system
+----------------------------
+EFS :is a  managed by NFS,we can mount EFS to multipule no.of instance,it is  shared storage
+NFS:network file system using nfs we can store data of multipule servers.
+EFS:in efs data will be store in form of single file 
+NOTE:we have to install clinte software to maount EFS, the clinte software are NFS OR EFS
+      * sudo yum install nfs-utils -y : to install nfs clinte
+    * EFS is irrespectable of availability zone we can mount servers of any AZ to EFS
+    * we have to open 2049 NFS port to mount EFS 
+
+using below command we can mount efs to servers in two diff AZ's. 
+# sudo mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport <end-point url of efs>:/   <directory ti be mounted>  
+
+if we mount EFS to two servers the files and data in server1 and server2 will be in sync.
+
+
+
+S3 : simple storage service
+-------------------------------
+
+s3:without any mounting storage to the server we can access s3.each and every object which we uploading to a object storage will have a uniqe id and endpoint(url).
+   using that url we can accesss it anywhere
+we can upload using aws gui,cli,api.
+s3 bucket name should be uniqe accross aws infra
+
+USE CASE
+----------
+s3 is the perfect place to store stastic files,eg:images,docs,image,mp3,..etc
+s3 is used to maintain backups
+
+by default we can create 100 s3 bucket in aws,if we want to crete more than 100 we have raise ticket.
+the max file(single file) size limit is 5tg = 5000 gb
+ METADATA:is data about data.
+   eg:the data about any file when it is cretared and size this is called metadata
+we have to give public access to access s3 out side
+using ACL(acces control list) we can grant the public access and secure the s3 bucket.
+
+NOTE:we have to write bucket policies.json file in bucket policies
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicRead",
+            "Effect": "Allow",
+            "Principal": "*",      
+            "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion"
+            ],
+            "Resource": "arn:aws:s3:::sandeepfg/*" 
+        }
+    ]
+}
+ARN:amezon resource name,it is a unique identifier which will allocate to aws resoure(iam user ec2,vpc,elb)
+versioning : if we disable versioning if we upload file with same name the old file will get deleted and new will remains,IF we enable versioning s3 will store both files as versions
+
+aws will apply charges based on storage classes and object lifecycle
+ 
+storage class are:standerd-->the data which we are going to access freqently are mainted in standard storage
+                  IA-->infrequent access are stored in IA
+                  RRS(one zone IA )-->reduced redundency storage.non critical and reproducsable data should be in rrs
+                  galacier-->archival data,old data which we still need should in glacier
+OBJECT LIFE CYCLE:using object life cycle we can transmit objects from one storage class to another and also we can delete or set expiery to object.
+
+REPLICATION:is used to transform bucket from one region to another region,
+-----------
+*)S3 replication will work only if we enable verisioning option
+
+NOTE:we have to mount this storage to sever if we want to access EBS,EFS.when it come to  s3 we no need to mount
+
+AWS SNOWBALL:
+
+
+NETWORKING-
+--------------------
+VPC:virtual private cloud
+ vpc is a priate network in aws,in which we can create our server our looad balncers and all ,we use vpc for isolate our resoures from others.
+ VPC is a regional level service we can create VPC in any region and subnets can be created in any AZ'S.
+ Subnets,IGW,routtable are  mandetory to create VPC.
+ In vpc we can control our virtual network envinorment. like ips,
+ we can create 5 VPC in a one rigion.
+
+in vpc we have subcomponents
+ subnets: sub networks----> dividing long network into small networks.
+ we can create 200 subnets in a single VPC .
+  their are two types of subnets:1)private subnet:the subnets which doest have access to internet.the subnet which dont have route to IGW in route table
+                                 2)public subnets:the subnets which can access internet.
+
+ IGW: internet gateway
+  IGW will anable internetwork connection to vpc.
+  we can attach only one(1)  IGW to one vpc.
+ Routtable: to link IGW to subnets.
+
+  NOTE:subnets,IGW,routtable are  mandetory to create VPC.
+ NAT instances/gatways: network address gateways.
+
+NAT:network address tansalator: is one of the network device which will enbale access to the internet for private subnets only one way.and also servers can communicate AWS api for private subnet.
+------------------------------   
+We have to create nat in public subnet.and we have to give the private subnet cidr in subnet alocation,we have add route table to route internet.
+We can create NAT only in public subnet and we have to map that nat to privte subnet to get internet for subnet.
+
+  NACL: network access control list
+  nacl is the firewall at subnet level.
+
+CIDR:classless inter domain routing,is a method for allocating ip address and ip routing.
+ex:174.13.0.0/16
+    the super block should be between 16-28
+   here /16 is sider block will define how many ips we are going to get
+   their is a formula 
+    2^(32-n)
+    2^(32-16)
+    ipv4:are 32 bit ips 
+ Note:we use RFC1918 to reserve for a private networks. an the cidrs are:
+RFC 1918 defines the following address ranges as private,
+
+10.0.0.0/8 (addresses 10.0.0.0 through 10.255.255.255 inclusive)
+172.16.0.0/12 (addresses 172.16.0.0 through 172.31.255.255 inclusive)
+192.168.0.0/16 (addresses 192.168.0.0 through 192.168.255.255 inclusive)The addresses in these ranges are not routable in the Internet and may be freely used by any organisation for local purposes only.
+Note that the address ranges are represented in classless IP addressing notation. For a description of this notation see, for example:
+
+CIDR: Classless Inter-Domain Routing.
+ NOTE:subnet cidr should be sudset of VPC cidr.
+ in each subnet 5 subnets will be reserved by aws,1st four and last 1 ips.
+ NOTE: we use vpc calculator to divide cird into no.of subnets.
+
+JUMPBOX:we use jumpbox concecpt to access a privte server,
+    jumpbox working:
+-------------------------
+ we use one public server as a jumpbox to connect to other private servers using ssh.in same vpc .
+  we use NAT instances to give private server internat access(only one way),using nat server will communicate to internet,but internet cant communicate with server.
+ 
+VPC PEERING:	
+-------------------
+NOTE:if cidr of vpc are overlaping we cant do vpc peering.
+we use vpc peering to create communication between two server in different vpcs.
+we can do vpc peering in two deffirent regions,and between two differnt accounts.
+we have to give route table in both accepter and reciver vpcs.
+
+
+ELB: Elastic loadbalencer
+----------------------------------
+OSI model:open system interconnection model,
+they have 7 layers:
+1.physical layer
+2.datalink layer
+3.network layer
+4.transport layer
+5.session layer
+6.presentation layer
+7.application layer
+loadbalancer will work on layer 4 and layer 7
+transport layer:tramit data using transmision protocals tcp and udp,they use source and destination datapacket.
+                network loadbalencer work on layer 4 ,it does not have  intiligent routing,
+Application layer:it can do intligent routing,ALB will on 7th layer,it works on https,http.
+
+Layer 7: What the user sees → HTTP/HTTPS
+Layer 6: Data encryption/formatting
+Layer 5: Session established between two devices
+Layer 4: TCP/UDP decides how data is delivered
+Layer 3: IP decides the route
+Layer 2: MAC decides local delivery inside network
+Layer 1: Bits physically travel over cable/wireless
+
+When the user hit the url or api this packet will flow in layer by layer to reach the remote server.
+
+#!/bin/bash
+sudo yum install java-1.8.0-openjdk-devel -y
+cd /opt
+sudo yum install wget -y
+sudo wget https://dlcdn.apache.org/tomcat/tomcat-8/v8.5.75/bin/apache-tomcat-8.5.75.tar.gz
+sudo tar -xvf apache-tomcat-8.5.75.tar.gz
+sudo rm apache-tomcat-8.5.75.tar.gz
+sudo mv apache-tomcat-8.5.75.tar.gz tomcat8
+sudo chmod 777 -R tomcat8
+cd /opt/tomcat8
+./bin/startup.sh
+
+types of ELB: 
+-----------------
+in ELB lisener and target groups are more importent.
+in ELB thier is  concepts called listener and target group.
+each ELB can have upto 50 listeners.
+each target group can contain upto 1000 targets(EC2)
+
+Atleast two public subnets should be their to create ELB.
+
+1.ALB:application loadbalencer
+ it supports HTTP AND  HTTPS PROTOCAL,it define routing on hosts and traffic type.it work on layer7.
+ when we use ALB target groups also should create on http and https protocol.
+ ALB will work on host base and path base routing.
+ in ALB health check will apply directly on application.we can the context path  of application inn health check.
+note: in ALB we can add rule in listener to wheater it is host based or path based routing we requier.
+  http:hyper text tranfer protocal
+  https:hyper text tranfer protocal secure
+2.NLB:network load balencer
+   it is capable of handel milion request,it work on layer4.it works on TCP AND UDP protocal.
+  when we use NLB target group also should be created in tcp or udp protocal.
+  NLB will not support host base or path base routing.
+  in NLB we can only perform healthcheck on port.
+3.CLB:classic loadbalencer ,it supports both layer7 and layer4.
+NOTE: In target group we find one option called attributes,here we can enable or disable roundrobin,leastoutstanding request,stickeysession
+   roundrobin:we tranfer trafic in circle form to all server in TG,
+   least outstanding request:we tranfer traffic to least load server.
+   stickeysession:it will stick to one server unless untill ur first server session expires.
+NOTE: all the access logs of ELB will store in S3 bucket.
+
+DNS
+----------
+domain name service:using dns we can map a name to ip.
+in our local we can give domain name for any ip in hosts file c:\Windows\System32\Drivers\etc\hosts.it will work only in our system.
+
+ROUT53:
+---------------------
+here we can purchase a domain and we can map our domain to requied LB.
+hosted zone will define domain name to access the tarafic.
+Atype record:is used to map to any ip adderss.
+CNAME record:is used to map other name like domain names 
+
+if we purchase domainame other than AWS like godaddy we have to give NS (nameserver) in hosted zone.
+
+we have to creat record to configure route traffic.
+
+ROUTE53>HOSTED ZONE>(DOMINNAME)>CREATE RECORD
+
+securing application
+-----------------------------
+we can secure application by ssl and tls in aws useing ACM(aws certificate manager).we can provision certificate in ACM.
+we have take certificates only in ca (certificate authority).
+steps to follow:
+--------------------------
+we have genarate DNS valiation in ACM there it will create a id.
+we have to create CNAME record in route 53 to prove that we are the owners of that domain.
+then it will reflect in route 53 in hosted zones.
+in ELB we have to add https listener.(as certifacte work on https protocal).while creating we can give certificate option also.
+we can redirect http to https protocal using edit rules of listenner.
+
+ AUTO SCALING GROUP:ASG
+----------------------------
+auto scaling helps us to ensure that to have the minimum number of ec2 instances (server) available to handle the load of the application.
+it will replace the servers if any mistake occure.
+
+we have some important ASG conspets:
+>auto scaling groups:will take care of all ec2 instances
+>launch configuration/template:it will takes care of which AMI  has to be created and all the requied configurations.
+we can  use userdata or golden immage to create instances.
+>scaling plan:(scaling policies)it tell when to scale and how to scale.we have some types of scaling
+ >manual:using gui,cli,api changing manualy
+ >scheduled:based on time events by scheduling.
+ >Dynamic:based on the load (cpu  load) on the servers we can create a plan.
+   this autoscaling will use cloudwatch internally.
+   cloudwatch:it is a monitoring service.
+
+GOLDEN IMMAGE: process create the same ami image from the existing server with same software inside the server.
+--------------
+steps to follow:
+-----------------------             
+ we have create image in the instance the to go action,there select create image ,and then giving name,then we have to check in AMI it will be refeclted there.
+ we have to create security group in same vpc with port number and same protocal which required to that application.
+
+IAM:identity and access managment
+-------------------------------------
+its all about autentication and authorization,we can access to the aws resources.
+ authenication:is nothing but identity,validating wheather the user is known to system are not.
+ authorization:permission what operations can perform.
+
+IAM policies:
+------------
+>policies:we can define permissions(read,write,update,delete) for a specific AWS resource using policies,policies are in json format.
+>users:user are humans(the guys who will intract and access aws).
+    user will get access  permission based on the policies dirctly or based on the policies attached to group which they blong to.
+ here we have two access:
+   1)console access:gui.
+   2)programatic access:cli,api(application programing interface),SDK(software devlopment kit(boto/boto3))
+>groups:collection of users.we can create users to the group,we can attach policies to the group .the users belongs to the group  will acces based on the policies attached to the group.
+>roles: will give the roles of ec2
+
+CLOUDWATCH
+-------------------
+ 1:basic monitoring(free trier):
+---------------------------------
+it free
+polls every 5 mins
+few matrices 
+2)detailed monitoring:
+--------------------------
+we have to pay 
+polls every 1 min
+more matrices
+
+CONCEPT IN CLOUD WATCH:
+-----------------------------
+1)matrics:
+-------------
+Metrics are the fundamental concept in CloudWatch. A metric represents a time-ordered set of data points that are published to CloudWatch. 
+Think of a metric as a variable to monitor, and the data points as representing the values of that variable over time.
+
+2)alarm:
+-------------
+if we have to create alerm for any matrics we have to create and subscribe SNS(simple notifcation service) topic.
+we have to create IAM polices and IAM role using that policies.
+
+3)events:
+---------------
+we can create a event rule,when every we need to get notified on any activity of our resources.
+
+4)logs:
+----------------
+
+we can enble all the log of aws resource.
+
+ECR:
+------------
+ECR Key
+
+Access: AKIAVVZPCMAVROQF4HSA 
+Secret: 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
+
+snap install aws-cli --classic
+
+aws configure
+
+This will prompt for:
+AWS Access Key ID
+AWS Secret Access Key
+Default region (e.g., ap-south-1)
+Default output format (json is common)
+
+aws ecr create-repository --repository-name sandeepaws --region ap-south-1
+aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+docker tag nginx:1 390403874859.dkr.ecr.ap-south-1.amazonaws.com/ngnix:1
+docker push 390403874859.dkr.ecr.ap-south-1.amazonaws.com/sandeep:1
+
+
+AWS LAMBDA:
+-----------------
+#This is the serverless service. Here we will deploy the applications with out ec2 server. Lambda will handel about server we just need to handel our code.
+#This is mostly used for event based triggers. This supports trigger like S3,SNS,API GATEWAY,...etc.
+#Example1: 
+ We want to get only .JPG files from S3 Bucket and push them into DB whenever client uplods file into S3. Here will trigger event for that Lambda Function.
+ Then Lmabda event will contains code to filter files and get .JPG and push into DB whenever new file uploaded into S3.
+ Example2:
+ Ec2 start and stop. We can write Lmabda event integrate with clodwatch to get time and trigger at scheduled time to start and stop EC2 in non production ENV.
+#Lambda can scale application upto 1000 appliction requests when it recive 1000 request at a single time.
+#Monitiring will be done by its own using Cloud watch.
+#This is pay as use function. We will pay only for usage not as go.
+#We need to mention Runtime of the application. Lambda have python,java,nodejs,ruby,go,.NET and also we can create on runtime as required.
+#This will wait only for 15 mins to start the application in Lambda. If it take more that 15min it will not take any requests.
+#We can add the layers as per the required. Here layers means the liberaries or any dependencies. This layer will be install lambda environments. Needed to add layers in functions.
+# We can have multiple lib's in single file and uplod into layers.This layers code should be less than 250 mb. 
+# We can access this Lambda Function using "FUNCTION URL". Which we configure the Fuction Url in "Configuration" Block.
+
+
+
+AWS CLOUD FORMATION: (IN AZURE ARM (AZURE RESOURCE MANAGER))
+------------------------------------------------------------
+
+# This is the IAAC service in AWS. 
+# In this we will create stack to create the what ever service we want in cloud.
+# This stack will use tempaltes to create services. Tempaltes can be writen in Declarative languages JSON or YAML.
+# We can upload this templates file from Device,S3 and can snyc from GITHUB.
+# We have an feature "Build from Infrastructure Composer" This will Prepare template file for service which we select.
+# IF we select "Build From Infrastructure Composer" we need go into "Create a template in Infrastructure Composer" and drag and drop the service then it will give you the template.
+
+# We can add resources into same stack by "update stack" option.
+# 
+
+
+ECS:
+--------
+This is AWS managed Container Orchestration service which will work only in AWS.
+IT has "FARGATE Only" "Fargate and managed instances" "Fargate and Self-managed instances".
+#Fargate only:Serverless – you don't think about creating or managing servers. Great for most common workloads.
+#Fargate and managed instances:Managed instances - Amazon ECS will manage patching and scaling on your behalf while giving you configurability about the types of instances. Great for more advanced workloads.
+#Fargate and Self-managed instances:Self-managed instances - you must ensure the instances are patched and scaled properly, and you have full control over the instances.
+This used to Deploy IMages and loadbalance and SCALE services.
+This Has "TASKS" and "Task Defination" To deploy image. We will Define the IMage and all required to run in "Task Denifination" Then run this defined task in "Tasks"
+This has "Service" to maintain/loadbalance/autoscale the tasks.
+
+But ECS has limitation It does not have HPA,STATEFULSET,DEMONSET,NAMESPACE...and lot.
+
+| Feature                 | ECS     | EKS/K8s             |
+| ----------------------- | ------- | ------------------- |
+| CRDs                    | ❌ No    | ✅ Yes               |
+| Operators               | ❌       | ✅                   |
+| DaemonSets              | ❌       | ✅                   |
+| StatefulSets            | ❌       | ✅                   |
+| Namespaces              | ❌       | ✅                   |
+| Network Policies        | ❌       | ✅                   |
+| Service Mesh            | Limited | Fully supported     |
+| Ingress Controllers     | Limited | Rich ecosystem      |
+| Autoscaling             | Basic   | Advanced (HPA/KEDA) |
+| CronJobs/Jobs           | ❌       | ✅                   |
+| Observability ecosystem | Limited | Very rich           |
+| Extensibility           | Low     | Very high           |
+
+
+We DO Have NAMESPACE in ECS but it is used to DNS mapping used "CloudMAP" Not for isolation..
+
+What “Namespace” in ECS Means
+In ECS, the namespace you see is actually related to:
+➡️ AWS Cloud Map Service Discovery Namespace
+In ECS, namespaces are used for:
+Service Discovery
+DNS names for ECS services
+Registering tasks inside Cloud Map
+
+| Feature                        | ECS Namespace     | K8s Namespace             |
+| ------------------------------ | ----------------- | ------------------------- |
+| Scope                          | Service Discovery | Logical cluster isolation |
+| Controls CPU/memory            | ❌ No              | ✅ Yes                     |
+| RBAC permissions               | ❌ No              | ✅ Yes                     |
+| Network Policies               | ❌ No              | ✅ Yes                     |
+| Resource quotas                | ❌ No              | ✅ Yes                     |
+| Multi-team isolation           | ❌ No              | ✅ Yes                     |
+| Provides DNS                   | ✅ Yes             | Optional                  |
+| Used for microservices mapping | ✅ Yes             | Not required              |
+
+
+Also We have deployment Strategy called DAEMONSET in ECS. But this will work only IN EC2 deployement not in FRAGATE.
+
+| Feature                       | ECS DAEMON | K8s DaemonSet |
+| ----------------------------- | ---------- | ------------- |
+| Runs one task per node        | ✅ Yes      | ✅ Yes         |
+| Works on Fargate              | ❌ No       | ✅ Yes         |
+| Node placement rules          | Limited    | Advanced      |
+| Taints/tolerations            | ❌ No       | ✅ Yes         |
+| Pod/Task lifecycle hooks      | ❌ Basic    | ✅ Full        |
+| Auto reschedule on node drain | ❌ No       | ✅ Yes         |
+| Health-based eviction         | ❌ No       | ✅ Yes         |
+| NodePool-specific deployment  | ❌ No       | ✅ Yes         |
+| Supports operators            | ❌ No       | ❌ Yes         |
+| Rolling updates               | ❌ Limited  | ✅ Full        |
+
+
+
+SNS - [SIMPLE NOTIFICATION SERVICE]
+----------------------------------------------
+This is NOFICATION service which will be used to notify for several service from AWS like S3,mail,http,https,lambda,SQS.
+We have "TOPICS and Subscriptions". 
+TOPIC: Here Topic will the used to write required massage and it will consists of all the details about SNS.
+
+#This Topics has two types 1: Standard and 2: FIFO
+1- standard: 
+This can be used when we need to delivery msg without depending in Order of msg and this can send multiple msgs at a time. It has High speed delivery.
+It will also send duplicate msgs.
+
+#2-FIFO:First-in → First-out (based on Message Group ID)
+This will delivery only one notification at any time. First-in → First-out (based on Message Group ID)
+This will not send duplicate msg. It is slow compared to standard.
+
+| Feature    | SNS Standard                 | SNS FIFO                             |
+| ---------- | ---------------------------- | ------------------------------------ |
+| Ordering   | ❌ No                         | ✔️ Guaranteed                        |
+| Duplicates | ✔️ Possible                  | ❌ No duplicates                      |
+| Throughput | Very high                    | Limited                              |
+| Latency    | Very low                     | Higher                               |
+| Cost       | Cheaper                      | Slightly more expensive              |
+| Use case   | Normal notifications, alerts | Payment, ordering, critical workflow |
+
+
+SUBSCRIPTION: Where we define the NOTIFICATION type it might be s3,lambda,mail,http what ever as our requirement.
+We will configure this SNS in other services using TOPIC_ARN.
+
+
+SCHEDULING: 
+
+#You cannot schedule SNS directly, but you can schedule SNS using EventBridge.
+Using EventBridge “Scheduler” (Recommended)
+Using EventBridge “Rules” (CRON or Rate)
+
+
+
